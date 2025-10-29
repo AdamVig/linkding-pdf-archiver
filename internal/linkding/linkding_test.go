@@ -10,7 +10,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
-const validTag = "video"
+const validTag = "pdf"
 const validBundleId = 2
 
 func TestGetBookmarksWithTag(t *testing.T) {
@@ -80,9 +80,9 @@ func TestGetBookmarkAssets(t *testing.T) {
 }
 
 func TestAddBookmarkAsset(t *testing.T) {
-	const expectedDisplayName = "test-asset.mp4"
-	const expectedContentType = "video/mp4"
-	expectedContent := []byte("Test content")
+	const expectedDisplayName = "test-asset.pdf"
+	const expectedContentType = "application/pdf"
+	expectedContent := []byte("%PDF-1.4\nTest PDF content")
 
 	client := getClient(t)
 
@@ -120,13 +120,14 @@ func TestAddBookmarkAsset(t *testing.T) {
 func getClient(t *testing.T) *Client {
 	godotenv.Load("../../.env")
 
-	client, err := NewClient(os.Getenv("LDMA_BASEURL"), os.Getenv("LDMA_TOKEN"))
+	client, err := NewClient(os.Getenv("LDPA_BASEURL"), os.Getenv("LDPA_TOKEN"))
 	check(t, err)
 
 	return client
 }
 
 func check(t *testing.T, err error) {
+	t.Helper()
 	if err != nil {
 		t.Fatal(err)
 	}

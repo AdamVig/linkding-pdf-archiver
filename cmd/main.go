@@ -2,10 +2,9 @@ package main
 
 import (
 	"flag"
-	"linkding-media-archiver/internal/job"
-	"linkding-media-archiver/internal/linkding"
-	"linkding-media-archiver/internal/logging"
-	"linkding-media-archiver/internal/ytdlp"
+	"linkding-pdf-archiver/internal/job"
+	"linkding-pdf-archiver/internal/linkding"
+	"linkding-pdf-archiver/internal/logging"
 	"log"
 	"log/slog"
 	"os"
@@ -21,19 +20,19 @@ import (
 func main() {
 	godotenv.Load()
 
-	isDryRun := flag.Bool("n", false, "Dry run: download media but do not actually upload it to Linkding")
+	isDryRun := flag.Bool("n", false, "Dry run: download PDFs but do not actually upload them to Linkding")
 	isSingleRun := flag.Bool("s", false, "Single run: exit after processing bookmarks once")
 	flag.Parse()
 
 	logger := logging.NewLogger()
 	slog.SetDefault(logger)
 
-	client, err := linkding.NewClient(os.Getenv("LDMA_BASEURL"), os.Getenv("LDMA_TOKEN"))
+	client, err := linkding.NewClient(os.Getenv("LDPA_BASEURL"), os.Getenv("LDPA_TOKEN"))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	tempdir, err := os.MkdirTemp(os.TempDir(), "media")
+	tempdir, err := os.MkdirTemp(os.TempDir(), "pdfs")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -45,7 +44,6 @@ func main() {
 
 	onInterrupt(cleanupAndExit)
 
-	ytdlp := ytdlp.NewYtdlp(tempdir, os.Getenv("LDMA_FORMAT"))
 	tags := getLinkdingTags()
 	bundleId := getLinkdingBundleId()
 	interval := getScanInterval()
@@ -58,7 +56,7 @@ func main() {
 		timeBeforeRun := time.Now()
 
 		config := job.JobConfiguration{Tags: tags, BundleId: bundleId, IsDryRun: *isDryRun, LastScan: lastScan}
-		err := job.ProcessBookmarks(client, ytdlp, config)
+		err := job.ProcessBookmarks(client, config)
 
 		if err == nil {
 			lastScan = timeBeforeRun // Only update last scan time when bookmarks were actually processed
@@ -75,12 +73,12 @@ func main() {
 }
 
 func getLinkdingTags() []string {
-	tagsEnv := os.Getenv("LDMA_TAGS")
+	tagsEnv := os.Getenv("LDPA_TAGS")
 	return strings.Fields(tagsEnv)
 }
 
 func getLinkdingBundleId() int {
-	bundleId, err := strconv.Atoi(os.Getenv("LDMA_BUNDLE_ID"))
+	bundleId, err := strconv.Atoi(os.Getenv("LDPA_BUNDLE_ID"))
 
 	if bundleId <= 0 || err != nil {
 		bundleId = 0
@@ -90,7 +88,7 @@ func getLinkdingBundleId() int {
 }
 
 func getScanInterval() int {
-	interval, err := strconv.Atoi(os.Getenv("LDMA_SCAN_INTERVAL"))
+	interval, err := strconv.Atoi(os.Getenv("LDPA_SCAN_INTERVAL"))
 
 	if interval <= 0 || err != nil {
 		interval = 3600

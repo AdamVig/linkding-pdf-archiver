@@ -15,7 +15,10 @@ RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -v -o /app ./cmd/main.go
 
 FROM alpine:latest
 
-RUN apk add --no-cache yt-dlp
+LABEL org.opencontainers.image.source="https://github.com/AdamVig/linkding-pdf-archiver"
+LABEL org.opencontainers.image.licenses="MIT"
+LABEL org.opencontainers.image.title="linkding-pdf-archiver"
+LABEL org.opencontainers.image.description="Automatically download PDFs for your Linkding bookmarks"
 
 COPY --from=builder /app /
 

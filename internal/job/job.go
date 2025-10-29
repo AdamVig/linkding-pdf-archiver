@@ -1,8 +1,7 @@
 package job
 
 import (
-	"linkding-media-archiver/internal/linkding"
-	"linkding-media-archiver/internal/ytdlp"
+	"linkding-pdf-archiver/internal/linkding"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -10,7 +9,7 @@ import (
 	"sync"
 )
 
-func ProcessBookmarks(client *linkding.Client, ytdlp *ytdlp.Ytdlp, config JobConfiguration) (err error) {
+func ProcessBookmarks(client *linkding.Client, config JobConfiguration) (err error) {
 	logger := slog.With("tags", config.Tags, "bundleId", config.BundleId, "isDryRun", config.IsDryRun)
 
 	bookmarks, err := getBookmarks(client, config)
@@ -30,7 +29,7 @@ func ProcessBookmarks(client *linkding.Client, ytdlp *ytdlp.Ytdlp, config JobCon
 	failed := make(chan linkding.Bookmark, len(bookmarks))
 
 	for _, bookmark := range bookmarks {
-		paths, err := downloadMedia(client, ytdlp, bookmark)
+		paths, err := downloadPDF(client, bookmark)
 
 		if err != nil {
 			failed <- bookmark
@@ -41,7 +40,7 @@ func ProcessBookmarks(client *linkding.Client, ytdlp *ytdlp.Ytdlp, config JobCon
 		go func() {
 			defer wg.Done()
 
-			if err := uploadMedia(client, bookmark, paths, config.IsDryRun); err != nil {
+			if err := uploadPDF(client, bookmark, paths, config.IsDryRun); err != nil {
 				failed <- bookmark
 				return
 			}
@@ -85,7 +84,8 @@ func getBookmarks(client *linkding.Client, config JobConfiguration) ([]linkding.
 	return bookmarks, nil
 }
 
-func downloadMedia(client *linkding.Client, ytdlp *ytdlp.Ytdlp, bookmark linkding.Bookmark) ([]string, error) {
+func downloadPDF(client *linkding.Client, bookmark linkding.Bookmark) ([]string, error) {
+	// TODO skip if bookmark URL is not a PDF link (e.g., does not end with .pdf)
 	logger := slog.With("bookmarkId", bookmark.Id)
 	assets, err := client.GetBookmarkAssets(bookmark.Id)
 
@@ -94,28 +94,29 @@ func downloadMedia(client *linkding.Client, ytdlp *ytdlp.Ytdlp, bookmark linkdin
 		return nil, err
 	}
 
-	mediaAssetIndex := slices.IndexFunc(assets, func(asset linkding.Asset) bool {
+	pdfAssetIndex := slices.IndexFunc(assets, func(asset linkding.Asset) bool {
 		return asset.AssetType == "upload" && linkding.IsKnownMimeType(asset.ContentType)
 	})
 
-	if mediaAssetIndex > -1 {
-		logger.Info("Media asset already exists", "assetId", assets[mediaAssetIndex].Id)
+	if pdfAssetIndex > -1 {
+		logger.Info("PDF asset already exists", "assetId", assets[pdfAssetIndex].Id)
 		return nil, nil
 	}
 
-	logger.Info("Downloading media")
-	paths, err := ytdlp.DownloadMedia(bookmark.Url)
+	logger.Info("Downloading PDFs")
+	// TODO download PDFs from bookmark URL
+	// paths, err := DownloadPDF(bookmark.Url)
 
 	if err != nil {
-		logger.Error("Failed to download media", "error", err)
+		logger.Error("Failed to download PDFs", "error", err)
 		return nil, err
 	}
 
-	logger.Info("Media downloaded successfully", "paths", paths)
+	logger.Info("PDFs downloaded successfully", "paths", paths)
 	return paths, nil
 }
 
-func uploadMedia(client *linkding.Client, bookmark linkding.Bookmark, paths []string, isDryRun bool) error {
+func uploadPDF(client *linkding.Client, bookmark linkding.Bookmark, paths []string, isDryRun bool) error {
 	logger := slog.With("bookmarkId", bookmark.Id, "isDryRun", isDryRun)
 
 	for _, path := range paths {
@@ -124,7 +125,7 @@ func uploadMedia(client *linkding.Client, bookmark linkding.Bookmark, paths []st
 		file, err := os.Open(path)
 
 		if err != nil {
-			logger.Error("Failed to open media file", "path", path, "error", err)
+			logger.Error("Failed to open PDF file", "path", path, "error", err)
 			return err
 		}
 

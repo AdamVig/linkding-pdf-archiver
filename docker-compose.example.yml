@@ -8,15 +8,16 @@ services:
     volumes:
       - ./linkding-data:/etc/linkding/data
 
-  linkding-media-archiver:
-    container_name: linkding-media-archiver
+  linkding-pdf-archiver:
+    container_name: linkding-pdf-archiver
     restart: unless-stopped
-    image: proog/linkding-media-archiver:latest
+    image: ghcr.io/AdamVig/linkding-pdf-archiver:latest
     depends_on:
       linkding:
         condition: service_healthy
     environment:
-      - LDMA_BASEURL=http://linkding:9090
-      - LDMA_TOKEN= # Add your Linkding token
-      - LDMA_TAGS=video music youtube
-      - LDMA_SCAN_INTERVAL=3600
+      - LDPA_BASEURL=http://linkding:9090
+      - LDPA_TOKEN= # Add your Linkding token
+      - LDPA_TAGS=to-archive pdf
+      - LDPA_SCAN_INTERVAL=3600
+      - LDPA_LOG_FORMAT=text
