@@ -2,6 +2,7 @@ package job
 
 import (
 	"linkding-pdf-archiver/internal/linkding"
+	"linkding-pdf-archiver/internal/pdf"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -29,10 +30,17 @@ func ProcessBookmarks(client *linkding.Client, config JobConfiguration) (err err
 	failed := make(chan linkding.Bookmark, len(bookmarks))
 
 	for _, bookmark := range bookmarks {
-		paths, err := downloadPDF(client, bookmark)
+		if !pdf.IsPDF(bookmark.Url) {
+			logger.Debug("Skipping non-PDF URL", "url", bookmark.Url)
+			continue
+		}
+		path, err := downloadPDF(client, bookmark)
 
 		if err != nil {
 			failed <- bookmark
+			continue
+		}
+		if path == "" {
 			continue
 		}
 
@@ -40,7 +48,7 @@ func ProcessBookmarks(client *linkding.Client, config JobConfiguration) (err err
 		go func() {
 			defer wg.Done()
 
-			if err := uploadPDF(client, bookmark, paths, config.IsDryRun); err != nil {
+			if err := uploadPDF(client, bookmark, path, config.IsDryRun); err != nil {
 				failed <- bookmark
 				return
 			}
@@ -84,63 +92,56 @@ func getBookmarks(client *linkding.Client, config JobConfiguration) ([]linkding.
 	return bookmarks, nil
 }
 
-func downloadPDF(client *linkding.Client, bookmark linkding.Bookmark) ([]string, error) {
-	// TODO skip if bookmark URL is not a PDF link (e.g., does not end with .pdf)
+func downloadPDF(client *linkding.Client, bookmark linkding.Bookmark) (string, error) {
 	logger := slog.With("bookmarkId", bookmark.Id)
-	assets, err := client.GetBookmarkAssets(bookmark.Id)
 
+	assets, err := client.GetBookmarkAssets(bookmark.Id)
 	if err != nil {
 		logger.Error("Failed to fetch bookmark assets")
-		return nil, err
+		return "", err
 	}
 
-	pdfAssetIndex := slices.IndexFunc(assets, func(asset linkding.Asset) bool {
+	assetIndex := slices.IndexFunc(assets, func(asset linkding.Asset) bool {
 		return asset.AssetType == "upload" && linkding.IsKnownMimeType(asset.ContentType)
 	})
-
-	if pdfAssetIndex > -1 {
-		logger.Info("PDF asset already exists", "assetId", assets[pdfAssetIndex].Id)
-		return nil, nil
+	if assetIndex > -1 {
+		logger.Info("PDF asset already exists", "assetId", assets[assetIndex].Id)
+		return "", nil
 	}
 
-	logger.Info("Downloading PDFs")
-	// TODO download PDFs from bookmark URL
-	// paths, err := DownloadPDF(bookmark.Url)
+	logger.Info("Downloading PDF")
+	path, err := pdf.Download(bookmark.Url)
 
 	if err != nil {
-		logger.Error("Failed to download PDFs", "error", err)
-		return nil, err
+		logger.Error("Failed to download PDF", "error", err)
+		return "", err
 	}
 
-	logger.Info("PDFs downloaded successfully", "paths", paths)
-	return paths, nil
+	logger.Info("PDF downloaded successfully", "path", path)
+	return path, nil
 }
 
-func uploadPDF(client *linkding.Client, bookmark linkding.Bookmark, paths []string, isDryRun bool) error {
+func uploadPDF(client *linkding.Client, bookmark linkding.Bookmark, path string, isDryRun bool) error {
 	logger := slog.With("bookmarkId", bookmark.Id, "isDryRun", isDryRun)
 
-	for _, path := range paths {
-		logger.Info("Adding asset", "path", path)
+	logger.Info("Adding asset", "path", path)
 
-		file, err := os.Open(path)
+	// Always clean up temp directory when done
+	defer os.RemoveAll(filepath.Dir(path))
 
-		if err != nil {
-			logger.Error("Failed to open PDF file", "path", path, "error", err)
-			return err
-		}
-
-		defer file.Close()
-		defer os.Remove(path)
-
-		asset, err := uploadAsset(client, bookmark, file, isDryRun)
-
-		if err != nil {
-			logger.Error("Failed to add asset", "path", path, "error", err)
-			return err
-		}
-
-		logger.Info("Asset added successfully", "path", path, "assetId", asset.Id)
+	file, err := os.Open(path)
+	if err != nil {
+		logger.Error("Failed to open PDF file", "path", path, "error", err)
+		return err
 	}
+	defer file.Close()
+
+	asset, err := uploadAsset(client, bookmark, file, isDryRun)
+	if err != nil {
+		logger.Error("Failed to add asset", "path", path, "error", err)
+		return err
+	}
+	logger.Info("Asset added successfully", "path", path, "assetId", asset.Id)
 
 	return nil
 }
