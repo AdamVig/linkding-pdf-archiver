@@ -1,5 +1,8 @@
 # Linkding PDF Archiver
 
+> [!NOTE]
+> Linkding now has [native support for capturing PDFs](https://github.com/sissbruecker/linkding/pull/1271), so this tool is no longer necessary!
+
 > **Note:** This is a fork of [proog/linkding-media-archiver](https://github.com/proog/linkding-media-archiver) with additional modifications by [AdamVig](https://github.com/AdamVig).
 
 Automatically download PDFs for your [Linkding](https://linkding.link/) bookmarks
